@@ -115,4 +115,4 @@ The app reads its Gemini API key from **Streamlit's built-in secrets manager** (
 
 ## Author
 
-Built by [Your Name] as part of The Skillians' 1-week Generative AI Developer Internship Build Sprint.
+Built by Siddhanth Jain as part of The Skillians' 1-week Generative AI Developer Internship Build Sprint.
