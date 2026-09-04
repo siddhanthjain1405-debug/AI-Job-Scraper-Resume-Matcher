@@ -423,6 +423,10 @@ try {
 
 THEME_TOGGLE_CSS = """
 <style>
+    .stDeployButton {
+        display: none !important;
+    }
+
     .theme-toggle-marker { display: none; }
 
     div.element-container:has(div.theme-toggle-marker) + div.element-container {
