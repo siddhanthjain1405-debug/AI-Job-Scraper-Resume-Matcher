@@ -4,6 +4,8 @@ An AI-powered ATS (Applicant Tracking System) simulator that compares a resume a
 
 **Live Demo:** [add your deployed Streamlit URL here]
 <img width="1761" height="878" alt="Screenshot 2026-09-05 030450" src="https://github.com/user-attachments/assets/62b4b778-b3bc-4a4e-924d-8a992cae3488" />
+<img width="1755" height="875" alt="Screenshot 2026-09-05 032733" src="https://github.com/user-attachments/assets/18ece8ff-2da2-40e6-af60-bacceff029ed" />
+<img width="1755" height="867" alt="image" src="https://github.com/user-attachments/assets/ff040112-c10f-487b-84ae-66369a03a59d" />
 
 
 ---
