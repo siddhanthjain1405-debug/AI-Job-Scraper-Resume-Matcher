@@ -3,6 +3,7 @@ import re
 import io
 import html
 import base64
+import time
 from datetime import datetime
 
 import requests
@@ -194,7 +195,7 @@ def analyze_resume_match(api_key: str, job_description: str, resume_text: str) -
     if response.status_code == 404:
         return {}, f"Model '{GEMINI_MODEL}' is not available for this API key/version."
     if response.status_code == 429:
-        return {}, "Gemini API quota exceeded. Please check your API usage/billing."
+        return {}, "Gemini rate limit hit (too many requests too fast on the free tier). Wait about a minute and try again."
     if response.status_code != 200:
         return {}, f"AI analysis failed: Gemini returned HTTP {response.status_code}: {response.text[:300]}"
 
@@ -669,6 +670,10 @@ def _run_analysis(api_key: str, job_description: str, resume_items: list) -> lis
             (idx - 1) / total,
             text=f"Processing {item['name']} ({idx}/{total})...",
         )
+
+        if idx > 1:
+            time.sleep(2)
+
         result, ai_error = analyze_resume_match(api_key, job_description, item["text"])
         if ai_error:
             all_results.append({
