@@ -152,8 +152,57 @@ def _sanitize_for_api(text: str) -> str:
     return text.encode("ascii", "ignore").decode("ascii")
 
 
-GEMINI_MODEL = "gemini-3.6-flash"
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+GEMINI_MODEL_CANDIDATES = [
+    "gemini-3.6-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-flash-latest",
+]
+
+
+def _call_gemini(model: str, api_key: str, prompt: str) -> tuple[dict, str, int]:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.3,
+            "maxOutputTokens": 2048,
+            "responseMimeType": "application/json",
+        },
+    }
+
+    try:
+        response = requests.post(url, params={"key": api_key}, json=payload, timeout=60)
+    except requests.exceptions.RequestException as e:
+        return {}, f"Network error while contacting Gemini: {e}", 0
+
+    if response.status_code in (401, 403):
+        return {}, "Invalid Gemini API key. Please check the key configured for this app.", response.status_code
+    if response.status_code == 404:
+        return {}, f"Model '{model}' is not available for this API key/version.", 404
+    if response.status_code == 429:
+        return {}, f"Rate limit / quota hit on model '{model}'.", 429
+    if response.status_code != 200:
+        return {}, f"Gemini returned HTTP {response.status_code}: {response.text[:300]}", response.status_code
+
+    try:
+        data = response.json()
+    except ValueError:
+        return {}, "The AI response could not be parsed. Please try again.", 200
+
+    try:
+        text_out = data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError, TypeError):
+        finish_reason = None
+        try:
+            finish_reason = data["candidates"][0].get("finishReason")
+        except Exception:
+            pass
+        if finish_reason:
+            return {}, f"The AI model did not return usable content (reason: {finish_reason}).", 200
+        return {}, "The AI model returned an empty response. Please try again.", 200
+
+    return {"text": text_out}, "", 200
 
 
 def analyze_resume_match(api_key: str, job_description: str, resume_text: str) -> tuple[dict, str]:
@@ -171,50 +220,26 @@ def analyze_resume_match(api_key: str, job_description: str, resume_text: str) -
         resume_text=_sanitize_for_api(resume_text[:15000]),
     )
 
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 2048,
-            "responseMimeType": "application/json",
-        },
-    }
+    last_error = "AI analysis failed for an unknown reason."
+    text_out = None
 
-    try:
-        response = requests.post(
-            GEMINI_API_URL,
-            params={"key": api_key.strip()},
-            json=payload,
-            timeout=60,
+    for model in GEMINI_MODEL_CANDIDATES:
+        outcome, error, status_code = _call_gemini(model, api_key.strip(), prompt)
+        if not error:
+            text_out = outcome["text"]
+            break
+
+        last_error = error
+        if status_code in (401, 403):
+            return {}, error
+        # 404 (model unavailable) or 429 (rate/quota) -> try the next candidate model
+        continue
+
+    if text_out is None:
+        return {}, (
+            "All available Gemini models hit a rate limit or quota error. "
+            f"Last error: {last_error} Please wait a few minutes and try again."
         )
-    except requests.exceptions.RequestException as e:
-        return {}, f"Network error while contacting Gemini: {e}"
-
-    if response.status_code in (401, 403):
-        return {}, "Invalid Gemini API key. Please check the key in the sidebar."
-    if response.status_code == 404:
-        return {}, f"Model '{GEMINI_MODEL}' is not available for this API key/version."
-    if response.status_code == 429:
-        return {}, "Gemini rate limit hit (too many requests too fast on the free tier). Wait about a minute and try again."
-    if response.status_code != 200:
-        return {}, f"AI analysis failed: Gemini returned HTTP {response.status_code}: {response.text[:300]}"
-
-    try:
-        data = response.json()
-    except ValueError:
-        return {}, "The AI response could not be parsed. Please try again."
-
-    try:
-        text_out = data["candidates"][0]["content"]["parts"][0]["text"]
-    except (KeyError, IndexError, TypeError):
-        finish_reason = None
-        try:
-            finish_reason = data["candidates"][0].get("finishReason")
-        except Exception:
-            pass
-        if finish_reason:
-            return {}, f"The AI model did not return usable content (reason: {finish_reason})."
-        return {}, "The AI model returned an empty response. Please try again."
 
     cleaned = clean_json_response(text_out)
 
