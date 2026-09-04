@@ -814,7 +814,7 @@ def main():
         else:
             st.caption("No analyses yet this session.")
         st.markdown("---")
-        st.caption("Built with Streamlit · Gemini 2.5 Flash")
+        st.caption("Built with Streamlit · Gemini 3.6 Flash")
 
     if "dark_mode" not in st.session_state:
         st.session_state.dark_mode = True
